@@ -1,6 +1,7 @@
 const { Stack, Fn } = require('aws-cdk-lib')
 const { Runtime, Code, Function } = require('aws-cdk-lib/aws-lambda')
-const { RestApi, LambdaIntegration } = require('aws-cdk-lib/aws-apigateway')
+const { PolicyStatement, Effect } = require('aws-cdk-lib/aws-iam')
+const { RestApi, LambdaIntegration, AuthorizationType } = require('aws-cdk-lib/aws-apigateway')
 const { NodejsFunction } = require('aws-cdk-lib/aws-lambda-nodejs')
 
 class ApiStack extends Stack {
@@ -50,7 +51,19 @@ class ApiStack extends Stack {
     const getIndexLambdaIntegration = new LambdaIntegration(getIndexFunction)
     const getRestaurantsLambdaIntegration = new LambdaIntegration(getRestaurantsFunction)
     api.root.addMethod('GET', getIndexLambdaIntegration)
-    api.root.addResource('restaurants').addMethod('GET', getRestaurantsLambdaIntegration)
+    api.root.addResource('restaurants')
+      .addMethod('GET', getRestaurantsLambdaIntegration, {
+        authorizationType: AuthorizationType.IAM
+      })
+    
+    const apiInvokePolicy = new PolicyStatement({
+      effect: Effect.ALLOW,
+      actions: ['execute-api:Invoke'],
+      resources: [
+        Fn.sub(`arn:aws:execute-api:\${AWS::Region}:\${AWS::AccountId}:\${${apiLogicalId}}/${props.stageName}/GET/restaurants`)
+      ]
+    })
+    getIndexFunction.role?.addToPrincipalPolicy(apiInvokePolicy)
   }
 }
 
